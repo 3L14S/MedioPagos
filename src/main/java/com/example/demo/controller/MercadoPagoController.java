@@ -28,11 +28,15 @@ import com.example.demo.clasesMercadoPago.NotificacionMP;
 import com.example.demo.clasesMercadoPago.RespuestaLoca;
 import com.example.demo.clasesMercadoPago.RespuestaLocaMP;
 import com.example.demo.entities.Pago;
+import com.example.demo.entities.PagoConTarjeta;
 import com.example.demo.entities.Transaccion;
 import com.example.demo.middlewares.MiddlewareException;
 import com.example.demo.middlewares.Middlewares;
 import com.example.demo.service.PagoService;
 import com.example.demo.service.TransaccionService;
+import com.mercadopago.client.payment.PaymentClient;
+import com.mercadopago.client.payment.PaymentCreateRequest;
+import com.mercadopago.client.payment.PaymentPayerRequest;
 import com.mercadopago.client.preference.PreferenceBackUrlsRequest;
 import com.mercadopago.client.preference.PreferenceClient;
 import com.mercadopago.client.preference.PreferenceItemRequest;
@@ -40,6 +44,7 @@ import com.mercadopago.client.preference.PreferencePaymentMethodsRequest;
 import com.mercadopago.client.preference.PreferenceRequest;
 import com.mercadopago.exceptions.MPApiException;
 import com.mercadopago.exceptions.MPException;
+import com.mercadopago.resources.payment.Payment;
 import com.mercadopago.resources.preference.Preference;
 
 @RestController
@@ -256,9 +261,69 @@ public class MercadoPagoController {
 	
 	
 	@CrossOrigin(origins = "*")
-	@PostMapping(value = "/process_payment")
-	public ResponseEntity<?> pagoAPI(@RequestBody RespuestaLoca param)
-	{
-		return new ResponseEntity<String>("Retorno", HttpStatus.OK);	
+	@PostMapping(value = "/process_payment/{pago_id}")
+	public ResponseEntity<?> pagoAPI(@PathVariable(value = "pago_id") Long pago_id, @RequestBody PagoConTarjeta params) throws MPException, MPApiException {
+			
+			System.out.println(params.toString());
+			System.out.println(pago_id);
+			Payment nuevoPago = new Payment();
+			PaymentClient client = new PaymentClient();
+				
+			PaymentCreateRequest paymentCreateRequest =
+			   PaymentCreateRequest.builder()
+			   	   .binaryMode(true)
+			   	   .installments(params.getInstallments())
+			       .transactionAmount(params.getTransaction_amount())
+			       .token(params.getToken())
+			       .paymentMethodId(params.getPayment_method_id())
+			       .payer(
+			           PaymentPayerRequest.builder()
+			               .email(params.getPayer().getEmail())
+			               .firstName(params.getPayer().getName())
+			               .build())
+			       .build();
+			
+						
+			nuevoPago = client.create(paymentCreateRequest);
+		
+		
+	 
+
+			
+			
+			Transaccion transaccion = new Transaccion();
+			transaccion.setEstado(nuevoPago.getStatus());
+			transaccion.setFechaEstado(new Date().getTime());			
+			transaccion.setIdMedioPago((long) 1);
+			transaccion.setIdPago(pago_id);
+			transaccion.setIdTransaccion(nuevoPago.getId().toString());
+			transaccionService.save(transaccion);
+	
+			Optional<Pago> pago = pagoService.findById(pago_id);
+			pago.get().setEstadoPago(nuevoPago.getStatus());
+			pago.get().setFechaEstado(new Date().getTime());
+			pagoService.save(pago.get());
+			
+			
+			RestTemplate rest = new RestTemplate();
+			
+			pago.get().setNotificado(true);
+			pagoService.save(pago.get());
+				
+			String url = pago.get().getNotificationUrl();	 
+				
+			RespuestaLoca res = new RespuestaLoca();
+			res.estado = pago.get().getEstadoPago();
+			res.idTransaccionConsumidor = pago.get().getIdTransaccionConsumidor();
+				
+			rest.postForEntity(url, res, String.class);
+			
+	
+		
+			return new ResponseEntity<>("xd", HttpStatus.OK);	
+			
+		
+		
 	}
-}
+		
+  }

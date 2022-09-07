@@ -22,7 +22,7 @@ public class CronNotificarPago {
 
 //	CRON
 	//se ejecuta cada 1 minuto desde que termino la ejecucion anterior
-		@Scheduled(fixedDelay = 60000)	
+		@Scheduled(fixedDelay = 600000)	
 		public void reportTime() throws JsonMappingException, JsonProcessingException {
 			
 			//SE OBTIENEN DE LA BASE DE DATOS TODOS LOS PAGOS QUE NO HAN SIDO NOTIFICADOS
